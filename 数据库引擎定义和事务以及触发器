@@ -1,0 +1,101 @@
+数据库引擎：
+  1.定义：数据库的发动机。对于用户来说，不管是程序访问还是手动访问，都不是直接接触数据，而是通过和数据库引擎的对话来完成。对于关系型数据库，我们使用SQL语句
+  去访问数据库，引擎读取我们的语句，翻译，执行，返回数据。有种解释器的感觉。
+      
+  数据库引擎是用于存储，处理和保护数据的核心服务。通过它，我们可以控制访问权限和快速处理事务。从而满足企业应用程序大量的数据处理需求。包括创建用于存储
+  数据的表，和用于查看，管理，和保护数据安全的数据库对象。（例如索引，视图，存储过程）
+  
+  2.关于定义中的名词解释。
+  
+  事务：transaction
+    举例：银行存款操作
+    1）客户输入转账账号，金额等信息。
+    2）将指定金额存入指定账户。
+    这两个操作是关联的，不可分割的，如若第一个操作失败，第二个也不能被执行，否则银行就会亏钱。成功就必须都成功。
+    所以数据库事务就是对数据库做的一系列修改，可以是一个或多个操作步骤。在修改过程中不对数据库做真正的修改，而是写在缓存中，用户在终端可以预览变化，直到
+    所有操作全部完成，检查无误后一次性进行提交，并写入数据库，提交之前，所做的修改都可以取消，提交之后不可撤销，也只有在提交之后，其他用户才可以浏览其中
+    的变化。
+    
+    ACID性质：
+    原子性 automicity 事务中的所有操作不可分割，全部完成or全部撤销
+    一致性 consistency 并行处理的事务必须与某顺序串行执行处理结果一致
+    隔离性 isolation 一个事务的执行不被其他事务干扰，中间结果透明
+    持久性 durability 对于任意事务，数据库必须保证他的修改不被丢失
+    DBMS数据库管理系统负责ACID：ACD--日志记录系统。I--锁机制。只有持有该数据的锁的事务可以更改该数据。
+    实践出真知：
+    Mysql：
+    use STUDENT;
+    select * from COURSE;
+    start transaction;
+    update COURSE set TNO = 888 where CNO = '3-105';
+    commit;(rollback;)
+    输入rollback后结束事务，查看表，数据恢复并未修改。
+    
+  存储过程：
+    在大型数据库系统中，完成特定功能的SQL语句，一次编译永久有效，用户指定名字和参数来执行，数据量特别大时显著提升速度
+    show procedure status;
+    show procedure status where db = 'student';
+    show procedure status where definer = 'root@localhost';
+    查询字段类型select data_type from information_schema.columns where table_name ='tablename' and table_schema = 'dbname';
+    (数据库中有各种表来存放关于数据库表和系统的信息）
+    定义存储过程：
+    delimiter $
+    create procedure name(in name1 varchar(255), out output1 varchar(255))
+    begin
+        select * from table1 where name = 'name1';
+        set output1 = 'test';
+    end $
+    调用 call name('ccc',@result);
+  触发器（特殊的存储过程）
+  DML触发器
+  增删更新操作触发
+  After触发器只能定义在表上
+  Instead of 触发器 表或视图
+  有两个表inserted 和 deleted 虚表，系统在内存创建，只读
+  操作           inserted逻辑表      deleted逻辑表
+  增             存放增加的记录       
+  删                                存放被删除的记录
+  改             存放更新后的记录      存放删除前的记录
+  1）触发器新增
+  当触发触发器后，新插入的数据行会被插入inserted表，触发器通过检查inserted表来确定是否以及如何执行它。举例
+  场景：增加教师信息时必须教验性别是否为空
+  delimiter $$ (把分号换成别的符号)
+  create trigger test before insert
+  on teacher for each row
+  begin
+    if new.TSEX is null then
+      signal sqlstate 'HY000' set message_text = 'self define message';
+    end if;
+  end;
+  $$
+  这个触发器如果把 is null 换成 = NULL, 虽然语法上没问题，触发器也创建成功，但是起不到作用，调查后发现是无法处理空值，只有这么写才可。(is not null)
+  2）触发器删除
+  delimiter $
+  create trigger de_test before delete 
+  on teacher for each row
+  begin
+  insert into backup (TNO,TNAME) values (old.TNO,old.TNAME);
+  end;
+  $
+  备份删除的数据。
+  3)触发器更新
+  delimiter $$
+  create trigger update_test after update
+  on teacher for each row
+  begin
+    update course set TNO = new.TNO;
+  end;
+  $$
+  这样写当执行 update techer set TNO = '222' where TNAME = 'xx';时course 表中所有TNO字段都变成了'222'。
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
