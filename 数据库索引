@@ -14,3 +14,38 @@ MYISAM索引是可压缩的，并且和数据分开。INNODB数据文件就是�
 B-树：多叉查找树。中间结点存放数据。---查询性能不稳定。并且IO效率低。
 B+树：中间结点不存放数据。一次性可以更多的读入到内存中，大数据量时提升效率。
 红黑树：插入删除要频繁调整树的结构以保持性质。
+
+6 索引分类
+普通索引：没有任何限制。
+唯一索引：列值不重复，可以为空。
+主键索引：特殊的唯一索引，不可以为空。
+全文索引：
+组合索引：最左前缀原则：对三个字段建立联合索引，如果第二个没有使用索引，那么第三个也不会使用。同理如果第一个没用，后面的都不会用。
+
+索引失效条件
+or条：如果查询条件中带有or，则不会使用索引，如果想使用，把每个字段都建立索引。
+like查询，%开头索引失效，%在后面不失效
+  select * from teacher where teacher_name LIKE 'w%';不失效
+  select * from teacher where teacher_name LIKE '%w';失效
+内部函数：比如 select * from teacher where ABS(age) = 1;
+对索引列进行计算 select * from teacher where id = id + 1;
+隐式类型转换: 如果字段是字符型一定要加引号，否则失效
+  select * from teacher where id = '123'; //id 字段设置为char型，此时索引生效
+  select * from teacher where id = 123; //失效情况
+条件部分is null不会用，is not null会用
+
+
+7.sql语句的优化
+子查询变成left join
+limit分布优化，先利用ID定位，再分页
+or条件优化，union all的使用
+where 代替 having
+避免嵌套查询
+多字段查询使用联合索引
+
+
+
+
+
+
+
