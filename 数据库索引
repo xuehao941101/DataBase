@@ -36,14 +36,70 @@ like查询，%开头索引失效，%在后面不失效
 
 
 7.sql语句的优化
-子查询变成left join
-limit分布优化，先利用ID定位，再分页
-or条件优化，union all的使用
-where 代替 having
-避免嵌套查询
-多字段查询使用联合索引
+A 子查询变成left join
+B limit分布优化，先利用ID定位，再分页
+select * from table_name limit 100000,10;这种查询会扫描前十万个记录然后取十个，效率很低。可以利用主键索引提高效率。
+select * from table_name where id>(select id from table_name where id > 100000 limit 1) limit 10;
+但是如果是带where的查询分页例如：select * from teacher where age > 20 limit 100000,10;两种办法
+  1）子查询：select * from teacher where age>20 and id>=(select id from teacher where age>20 limit 100000, 1) limit 10;
+  2)连表查询：select * from teacher as table1
+              inner join
+                (select id from teacher where age > 20 limit 100000,1) as table 2
+                  on table1.id = table2.id;
 
+limit 1的使用：当数据确定只有一条并且该字段没有索引时，添加limit 1提升查找效率，查找到目标后不再继续扫描全表。
+select * from table_name where email = 'xxxxxxx' limit 1;条件字段是主键的时候不用加，效率一样。
 
+C or条件优化，union all的使用
+  例子：select * from TB1 where a1 = 'x' or a2 = 'y';
+       由于a1和a2上分别建有索引，但是or条件导致仅扫描任何一个索引都不能得到满足条件的全部数据，需要同时扫描两个索引并且求并集，
+       一般index merge特性是被关闭的，因为有未知风险，导致执行优化器只能进行全表扫描导致执行性能不佳。
+       所以用union all来替代or操作
+       select * from TB1 where a1 = 'x'
+       union all
+       select * from TB1 where a2 = 'y' and a1<>'x';
+       PS:第二个select中的不等于操作保证没有重复数据，再求交集。
+  挖坑：union all后对结果集进行排序会报错，一般采用创建临时表（起别名）对方式解决。
+D where 代替 having
+having是分组后过滤(having 语句是为了解决where无法使用聚合函数对问题，其他情况能用where用where）
+SELECT column_name, AVG(number)
+FROM table_name
+WHERE column_name = ‘value’
+GROUP BY column_name
+HAVING AVG(number) <> value2;
+用where句过滤行然后再分组
+select JOB,max(sal) from emp
+group by JOB
+having JOB <> 'clerk';
+
+优化为
+select JOB,max(sal) from emp
+where JOB <> 'clerk'
+group by JOB;
+E 避免嵌套查询
+F 多字段查询使用联合索引
+
+8.随时更新的实践遇到的问题
++-----+--------+------+---------------------+-------+------+-------+--------+
+| SNO | SNAME  | SSEX | SBIRTHDAY           | CLASS | SNO  | CNO   | DEGREE |
++-----+--------+------+---------------------+-------+------+-------+--------+
+| 101 | 李军   | 男   | 1976-02-20 00:00:00 | 95033 | 101  | 3-105 |   64.0 |
+| 101 | 李军   | 男   | 1976-02-20 00:00:00 | 95033 | 101  | 6-166 |   85.0 |
+| 103 | 陆君   | 男   | 1974-06-03 00:00:00 | 95031 | 103  | 3-245 |   86.0 |
+| 103 | 陆君   | 男   | 1974-06-03 00:00:00 | 95031 | 103  | 3-105 |   92.0 |
+| 105 | 匡明   | 男   | 1975-10-02 00:00:00 | 95031 | 105  | 3-245 |   75.0 |
+| 105 | 匡明   | 男   | 1975-10-02 00:00:00 | 95031 | 105  | 3-105 |   88.0 |
+| 107 | 王丽   | 女   | 1976-01-23 00:00:00 | 95033 | 107  | 3-105 |   91.0 |
+| 107 | 王丽   | 女   | 1976-01-23 00:00:00 | 95033 | 107  | 6-106 |   79.0 |
+| 108 | 曾华   | 男   | 1977-09-01 00:00:00 | 95033 | 108  | 3-105 |   78.0 |
+| 108 | 曾华   | 男   | 1977-09-01 00:00:00 | 95033 | 108  | 6-166 |   81.0 |
+| 109 | 王芳   | 女   | 1975-02-10 00:00:00 | 95031 | 109  | 3-245 |   68.0 |
+| 109 | 王芳   | 女   | 1975-02-10 00:00:00 | 95031 | 109  | 3-105 |   76.0 |
++-----+--------+------+---------------------+-------+------+-------+--------+
+select * from student as table1 left join SCORE as table2 on table1.SNO = table2.SNO order by SNO;（wrong）
+1）Column 'SNO' in order clause is ambiguous
+此时我用的是两个表联合查询，当SNO在两个表中都有的时候，order by需要指定是哪个表的SNO
+select * from student as table1 left join SCORE as table2 on table1.SNO = table2.SNO order by table1.SNO;（right）
 
 
 
