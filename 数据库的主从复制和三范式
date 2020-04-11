@@ -1,0 +1,23 @@
+主从复制工作过程
+1）在事务更新数据完成之前，master主服务器在二进制日志binary log中记载这些改变，mysql默认采用基于语句的复制，记录完成后，master通知引擎提交事务。
+2）slave从服务器将master的binlog复制到他自己的中继日志relaylog中。首先slave开启一个工作线程（I/O），I/O线程在master上打开一个普通连接，开始binlog
+dump process。这个process从master的二进制日志中读取事件，如果已经跟上了master的进度，他会睡眠等待master的新事件产生，I/O线程将这些事件写入中继日志。
+3）sql slave thread Sql从线程处理该过程的最后一步，sql线程从中继日志中读取事件，并且重放事件来更新slave sever的数据。只要该线程与I/O线程保持一致，
+中继日志通常位于OS缓存中，开销很小。
+
+数据库范式有很多，通常涉及到三个，第一范式，第二范式，第三范式。
+
+第一范式：强调列的原子性。即列不能够再分为其他列。比如一个（联系人）对应（家庭电话或者公司电话）就不符合第一范式。
+第二范式：第一范式 + 一是表必须有一个主键，其他不是主键的列必须完全取决于主键。不符合第二范式的表容易产生重复数据。
+例子：考虑一个表：  订单号，产品号，产品名称，单价，折扣，订单数量。
+一个订单可以有多个产品，一个产品也可以在多个订单中，所以单独的订单号或者产品号不足以成为主键，主键应该是（订单号，产品号）
+然而单价，产品名称仅仅取决于产品号，并不完全依赖于主键。可想而知会产生重复的数据，比如订单号，订单数量，订单日期。
+解决办法，把表拆分，例如拆成两个表：第一个：订单号，产品号，订单数量，折扣。第二个：产品号，单价，产品名称。
+
+第三范式：第二范式+ 非主键列必须直接依赖于主键，不能传递依赖。
+考虑一个订单表：OrderID，OrderDate，CustomerID，CustomerName，CustomerAddr，CustomerCity。
+主键是orderID。 OrderDate，CustomerID，CustomerName，CustomerAddr，CustomerCity 等非主键列都完全取决于主键（OrderID），所以符合 2NF。
+不过问题是 CustomerName，CustomerAddr，CustomerCity 直接依赖的是 CustomerID（非主键列），而不是直接依赖于主键.
+它是通过传递才依赖于主键，所以不符合 3NF。
+通过拆分为【Order】（OrderID，OrderDate，CustomerID）和
+【Customer】（CustomerID，CustomerName，CustomerAddr，CustomerCity）从而达到 3NF.
